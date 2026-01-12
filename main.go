@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -34,10 +35,12 @@ func main() {
 	myCommands.register("reset", handlerReset)
 	myCommands.register("users", handlerUsers)
 	myCommands.register("agg", handlerAgg)
-	myCommands.register("addfeed", handlerAddFeed)
+	myCommands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	myCommands.register("feeds", handlerGetFeeds)
-	myCommands.register("follow", handlerFollow)
-	myCommands.register("following", handlerFollowing)
+	myCommands.register("follow", middlewareLoggedIn(handlerFollow))
+	myCommands.register("following", middlewareLoggedIn(handlerFollowing))
+	myCommands.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	myCommands.register("browse", middlewareLoggedIn(handlerBrowse))
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("Not enough arguments passed")
@@ -53,5 +56,16 @@ func main() {
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
+	}
+}
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+		if err != nil {
+			return err
+		}
+
+		return handler(s, cmd, user)
 	}
 }
